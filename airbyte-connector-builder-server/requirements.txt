@@ -21,7 +21,7 @@ cachetools==5.3.3
     # via airbyte-cdk
 cattrs==23.2.3
     # via requests-cache
-certifi==2024.2.2
+certifi==2024.7.4
     # via requests
 cffi==1.16.0
     # via cryptography
@@ -89,7 +89,7 @@ pyyaml==6.0.1
     # via
     #   airbyte-cdk
     #   langchain-core
-requests==2.31.0
+requests==2.32.2
     # via
     #   airbyte-cdk
     #   langsmith
@@ -110,7 +110,7 @@ typing-extensions==4.11.0
     #   pydantic
 url-normalize==1.4.3
     # via requests-cache
-urllib3==2.2.1
+urllib3==2.2.2
     # via
     #   requests
     #   requests-cache
