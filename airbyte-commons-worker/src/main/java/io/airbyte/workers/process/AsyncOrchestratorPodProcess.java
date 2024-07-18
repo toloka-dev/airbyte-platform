@@ -20,6 +20,7 @@ import io.airbyte.workers.workload.exception.DocStoreAccessException;
 import io.fabric8.kubernetes.api.model.CapabilitiesBuilder;
 import io.fabric8.kubernetes.api.model.ContainerBuilder;
 import io.fabric8.kubernetes.api.model.ContainerPort;
+import io.fabric8.kubernetes.api.model.ContainerStatus;
 import io.fabric8.kubernetes.api.model.DeletionPropagation;
 import io.fabric8.kubernetes.api.model.EnvVar;
 import io.fabric8.kubernetes.api.model.Pod;
@@ -568,9 +569,15 @@ public class AsyncOrchestratorPodProcess implements KubePod {
     kubernetesClient.pods()
         .inNamespace(kubePodInfo.namespace())
         .withName(kubePodInfo.name())
-        .waitUntilCondition(p -> !p.getStatus().getInitContainerStatuses().isEmpty()
-            && p.getStatus().getInitContainerStatuses().get(0).getState().getWaiting() == null,
-            5, TimeUnit.MINUTES);
+        .waitUntilCondition(p -> {
+          List<ContainerStatus> initContainerStatuses = p.getStatus().getInitContainerStatuses();
+          for (ContainerStatus status : initContainerStatuses) {
+            if (status.getName().equals("init") && status.getState().getWaiting() == null) {
+              return true;
+            }
+          }
+          return false;
+        }, 5, TimeUnit.MINUTES);
 
     final var podStatus = kubernetesClient.pods()
         .inNamespace(kubePodInfo.namespace())
