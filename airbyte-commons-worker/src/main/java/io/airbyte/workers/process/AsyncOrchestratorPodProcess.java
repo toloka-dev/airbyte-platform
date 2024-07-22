@@ -588,7 +588,7 @@ public class AsyncOrchestratorPodProcess implements KubePod {
         .map(ContainerStatus::getState)
         .orElse(null);
 
-    if (containerState.getRunning() == null) {
+    if (containerState == null || containerState.getRunning() == null) {
       throw new RuntimeException("Pod was not running, state was: " + containerState);
     }
 
