@@ -412,8 +412,12 @@ public class KubePodProcess implements KubePod {
             .anyMatch(status -> "init".equals(status.getName()) && status.getState().getTerminated() != null),
             timeUnitsToWait, timeUnit);
 
-    Pod updatedPod = client.pods().inNamespace(podDefinition.getMetadata().getNamespace()).withName(podDefinition.getMetadata().getName()).get();
-    Integer exitValue = updatedPod.getStatus().getInitContainerStatuses()
+    final int exitValue = client.pods()
+        .inNamespace(podDefinition.getMetadata().getNamespace())
+        .withName(podDefinition.getMetadata().getName())
+        .get()
+        .getStatus()
+        .getInitContainerStatuses()
         .stream()
         .filter(status -> "init".equals(status.getName()) && status.getState().getTerminated() != null)
         .findAny()
