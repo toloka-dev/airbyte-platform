@@ -569,15 +569,10 @@ public class AsyncOrchestratorPodProcess implements KubePod {
     kubernetesClient.pods()
         .inNamespace(kubePodInfo.namespace())
         .withName(kubePodInfo.name())
-        .waitUntilCondition(p -> {
-          List<ContainerStatus> initContainerStatuses = p.getStatus().getInitContainerStatuses();
-          for (ContainerStatus status : initContainerStatuses) {
-            if (status.getName().equals("init") && status.getState().getWaiting() == null) {
-              return true;
-            }
-          }
-          return false;
-        }, 5, TimeUnit.MINUTES);
+        .waitUntilCondition(p -> p.getStatus().getInitContainerStatuses()
+            .stream()
+            .anyMatch(status -> "init".equals(status.getName()) && status.getState().getWaiting() == null),
+            5, TimeUnit.MINUTES);
 
     final var podStatus = kubernetesClient.pods()
         .inNamespace(kubePodInfo.namespace())
@@ -587,8 +582,11 @@ public class AsyncOrchestratorPodProcess implements KubePod {
 
     final var containerState = podStatus
         .getInitContainerStatuses()
-        .get(0)
-        .getState();
+        .stream()
+        .filter(status -> "init".equals(status.getName()))
+        .findAny()
+        .map(ContainerStatus::getState)
+        .orElse(null);
 
     if (containerState.getRunning() == null) {
       throw new RuntimeException("Pod was not running, state was: " + containerState);

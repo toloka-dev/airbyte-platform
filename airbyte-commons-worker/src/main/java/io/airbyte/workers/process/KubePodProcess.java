@@ -26,7 +26,6 @@ import io.fabric8.kubernetes.api.model.Container;
 import io.fabric8.kubernetes.api.model.ContainerBuilder;
 import io.fabric8.kubernetes.api.model.ContainerPort;
 import io.fabric8.kubernetes.api.model.ContainerPortBuilder;
-import io.fabric8.kubernetes.api.model.ContainerStatus;
 import io.fabric8.kubernetes.api.model.DeletionPropagation;
 import io.fabric8.kubernetes.api.model.EnvVar;
 import io.fabric8.kubernetes.api.model.EnvVarSource;
@@ -391,15 +390,10 @@ public class KubePodProcess implements KubePod {
   private static void waitForInitPodToRun(final KubernetesClient client, final Pod podDefinition) throws InterruptedException {
     LOGGER.info("Waiting for init container to be ready before copying files...");
     client.pods().inNamespace(podDefinition.getMetadata().getNamespace()).withName(podDefinition.getMetadata().getName())
-        .waitUntilCondition(p -> {
-          List<ContainerStatus> initContainerStatuses = p.getStatus().getInitContainerStatuses();
-          for (ContainerStatus status : initContainerStatuses) {
-            if (status.getName().equals("init") && status.getState().getRunning() != null) {
-              return true;
-            }
-          }
-          return false;
-        }, INIT_CONTAINER_STARTUP_TIMEOUT.toMinutes(), TimeUnit.MINUTES);
+        .waitUntilCondition(p -> p.getStatus().getInitContainerStatuses()
+            .stream()
+            .anyMatch(status -> "init".equals(status.getName()) && status.getState().getRunning() != null),
+            INIT_CONTAINER_STARTUP_TIMEOUT.toMinutes(), TimeUnit.MINUTES);
     LOGGER.info("Init container ready..");
   }
 
@@ -413,25 +407,18 @@ public class KubePodProcess implements KubePod {
       throws InterruptedException {
     LOGGER.info("Waiting for init container to terminate before checking exit value...");
     client.pods().inNamespace(podDefinition.getMetadata().getNamespace()).withName(podDefinition.getMetadata().getName())
-        .waitUntilCondition(p -> {
-          List<ContainerStatus> initContainerStatuses = p.getStatus().getInitContainerStatuses();
-          for (ContainerStatus status : initContainerStatuses) {
-            if (status.getName().equals("init") && status.getState().getTerminated() != null) {
-              return true;
-            }
-          }
-          return false;
-        }, timeUnitsToWait, timeUnit);
+        .waitUntilCondition(p -> p.getStatus().getInitContainerStatuses()
+            .stream()
+            .anyMatch(status -> "init".equals(status.getName()) && status.getState().getTerminated() != null),
+            timeUnitsToWait, timeUnit);
 
     Pod updatedPod = client.pods().inNamespace(podDefinition.getMetadata().getNamespace()).withName(podDefinition.getMetadata().getName()).get();
-    List<ContainerStatus> initContainerStatuses = updatedPod.getStatus().getInitContainerStatuses();
-    Integer exitValue = null;
-    for (ContainerStatus status : initContainerStatuses) {
-      if (status.getName().equals("init") && status.getState().getTerminated() != null) {
-        exitValue = status.getState().getTerminated().getExitCode();
-        break;
-      }
-    }
+    Integer exitValue = updatedPod.getStatus().getInitContainerStatuses()
+        .stream()
+        .filter(status -> "init".equals(status.getName()) && status.getState().getTerminated() != null)
+        .findAny()
+        .map(status -> status.getState().getTerminated().getExitCode())
+        .orElse(null);
 
     if (exitValue != null) {
       LOGGER.info("Init container terminated with exit value {}.", exitValue);
